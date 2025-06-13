@@ -37,9 +37,19 @@ header p {
 /* 画廊网格布局 */
 .gallery {
     display: grid;
-    /* 响应式布局：在不同屏幕宽度下显示不同列数 */
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(3, 1fr); /* 默认显示3列 */
     gap: 1.5rem; /* 图片之间的间距 */
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+    .gallery {
+        grid-template-columns: 1fr; /* 在手机上显示1列 */
+    }
+    
+    .gallery-item img {
+        height: 300px; /* 在手机上增加图片高度 */
+    }
 }
 
 /* 单个画廊项目 */
