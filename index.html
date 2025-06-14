@@ -35,207 +35,165 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lightgallery/2.7.2/plugins/thumbnail/lg-thumbnail.min.js"></script>
 
     <script>
-        // =========================================================================
-        // ========= 你唯一需要修改的地方：你的9个相册配置 ============
-        // =========================================================================
-        const galleries = [
-            { title: "独家精选", folder: "Selected" },
-            { title: "当然要合照啦", folder: "Together" },
-            { title: "环球旅行进行中", folder: "Travel" },
-            { title: "那些闪闪发光的日子", folder: "Anniversary" },
-            { title: "爱就是一起吃好多顿饭", folder: "Food" },
-            { title: "陪你日常也是极欢喜", folder: "Daily" },
-            { title: "我们解锁的新技能", folder: "Activities" },
-            { title: "故事开始之前", folder: "Past" },
-            { title: "未完待续", folder: "TBD" }
-        ];
-        // =========================================================================
-        // ====================== 以下代码无需修改 ========================
-        // =========================================================================
-    
-        const galleryGrid = document.getElementById('gallery-grid');
-        const loadingMessage = document.querySelector('.loading-message');
-    
-        // 探测单个图片是否存在 (处理 jpg 和 png)
-        async function probeImage(pathWithoutExtension) {
-            const extensions = ['jpg', 'png', 'jpeg', 'gif']; // 你可以添加更多支持的格式
-            for (const ext of extensions) {
-                const path = `${pathWithoutExtension}.${ext}`;
-                try {
-                    await new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.onload = resolve;
-                        img.onerror = reject;
-                        img.src = path;
-                    });
-                    return path; // 如果成功加载，返回完整路径
-                } catch (error) {
-                    // 如果当前格式失败，继续尝试下一个格式
-                    continue;
+        document.addEventListener('DOMContentLoaded', () => {
+        
+            // =========================================================================
+            // ========= 你唯一需要修改的地方：你的9个相册配置 ============
+            // =========================================================================
+            const galleries = [
+                { title: "独家精选", folder: "Selected" },
+                { title: "当然要合照啦", folder: "Together" },
+                { title: "环球旅行进行中", folder: "Travel" },
+                { title: "那些闪闪发光的日子", folder: "Anniversary" },
+                { title: "爱就是一起吃好多顿饭", folder: "Food" },
+                { title: "陪你日常也是极欢喜", folder: "Daily" },
+                { title: "我们解锁的新技能", folder: "Activities" },
+                { title: "故事开始之前", folder: "Past" },
+                { title: "未完待续", folder: "TBD" }
+            ];
+        
+            // =========================================================================
+            // ====================== 以下代码无需修改 ========================
+            // =========================================================================
+        
+            // 新增！定义最大连续空缺数，你可以根据需要调整这个值
+            const MAX_SEQUENTIAL_GAPS = 100;
+        
+            const galleryGrid = document.getElementById('gallery-grid');
+            const loadingMessage = document.querySelector('.loading-message');
+        
+            // 探测单个数字的图片是否存在 (处理多种格式)
+            async function probeImageForNumber(basePath, number) {
+                const extensions = ['jpg', 'png', 'jpeg', 'gif', 'heic', 'webp'];
+                for (const ext of extensions) {
+                    const path = `${basePath}/${number}.${ext}`;
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const img = new Image();
+                            img.onload = resolve;
+                            img.onerror = reject;
+                            img.src = path;
+                        });
+                        return path; // 成功则返回路径
+                    } catch (error) {
+                        continue; // 失败则尝试下个格式
+                    }
                 }
+                return null; // 所有格式都失败
             }
-            return null; // 如果所有格式都失败了，返回 null
-        }
-    
-        // 主函数，创建并填充所有相册
-        async function createGalleries() {
-            // 隐藏加载提示
-            if(loadingMessage) loadingMessage.style.display = 'none';
-    
-            let galleryIdCounter = 1;
-            for (const galleryInfo of galleries) {
-                const imagePaths = [];
-                let i = 1;
-                while (true) {
-                    const imagePath = await probeImage(`images/${galleryInfo.folder}/${i}`);
+        
+            // 全新！更智能的图片查找函数
+            async function findImagesInFolder(folderPath) {
+                const foundPaths = [];
+                let currentNumber = 1;
+                let gapCounter = 0;
+        
+                while (gapCounter < MAX_SEQUENTIAL_GAPS) {
+                    const imagePath = await probeImageForNumber(folderPath, currentNumber);
+                    
                     if (imagePath) {
-                        imagePaths.push(imagePath);
-                        i++;
+                        foundPaths.push(imagePath);
+                        gapCounter = 0; // 找到图片，空缺计数清零
                     } else {
-                        break; // 当找不到图片时（jpg和png都试过），停止探测
+                        gapCounter++; // 未找到图片，空缺计数加一
                     }
+                    currentNumber++;
                 }
-    
-                if (imagePaths.length > 0) {
-                    const galleryId = `gallery-album-${galleryIdCounter++}`;
-                    const coverImage = imagePaths[0];
-    
-                    // 创建相册的 HTML 结构
-                    const galleryItem = document.createElement('div');
-                    galleryItem.id = galleryId;
-                    galleryItem.className = 'gallery-item';
-    
-                    let htmlContent = `
-                        <a href="${coverImage}">
-                            <img src="${coverImage}" alt="${galleryInfo.title}">
-                        </a>
-                        <p class="caption">${galleryInfo.title}</p>
-                    `;
-                    
-                    // 添加图集里其他隐藏的图片链接
-                    for (let j = 1; j < imagePaths.length; j++) {
-                        htmlContent += `<a href="${imagePaths[j]}" style="display:none;"></a>`;
+                return foundPaths;
+            }
+        
+            async function createGalleries() {
+                if (loadingMessage) loadingMessage.style.display = 'none';
+        
+                let galleryIdCounter = 1;
+                for (const galleryInfo of galleries) {
+                    const imagePaths = await findImagesInFolder(`images/${galleryInfo.folder}`);
+        
+                    if (imagePaths.length > 0) {
+                        const galleryId = `gallery-album-${galleryIdCounter++}`;
+                        const coverImage = imagePaths[0]; // 默认找到的第一张作为封面
+        
+                        const galleryItem = document.createElement('div');
+                        galleryItem.id = galleryId;
+                        galleryItem.className = 'gallery-item';
+        
+                        let htmlContent = `
+                            <a href="${coverImage}">
+                                <img src="${coverImage}" alt="${galleryInfo.title}">
+                            </a>
+                            <p class="caption">${galleryInfo.title}</p>
+                        `;
+                        
+                        // 从第二张开始，作为隐藏的图集项
+                        for (let j = 1; j < imagePaths.length; j++) {
+                            htmlContent += `<a href="${imagePaths[j]}" style="display:none;"></a>`;
+                        }
+                        
+                        galleryItem.innerHTML = htmlContent;
+                        galleryGrid.appendChild(galleryItem);
+        
+                        // 初始化 lightgallery, 允许下载
+                        lightGallery(galleryItem, {
+                            selector: 'a',
+                            thumbnail: true,
+                            download: true,
+                        });
                     }
-                    
-                    galleryItem.innerHTML = htmlContent;
-                    galleryGrid.appendChild(galleryItem);
-    
-                    // 初始化 lightgallery
-                    lightGallery(galleryItem, {
-                        selector: 'a',
-                        thumbnail: true,
-                        download: false
-                    });
                 }
             }
-        }
-    
-        // 启动！
-        createGalleries();
-    </script>
-    <script>
-        // // 相册配置
-        // const galleryConfig = [
-        //     { id: 'album1', title: '相遇之前', folder: 'images/past', count: 3 },
-        //     { id: 'album2', title: '生活点滴', folder: 'images/daily', count: 3 },
-        //     { id: 'album3', title: '特别纪念日', folder: 'images/special', count: 2 },
-        //     { id: 'album4', title: '甜蜜时光', folder: 'images/sweet', count: 5 },
-        //     { id: 'album5', title: '旅行记忆', folder: 'images/travel', count: 6 },
-        //     { id: 'album6', title: '美食记录', folder: 'images/food', count: 4 },
-        //     { id: 'album7', title: '节日庆祝', folder: 'images/festival', count: 3 },
-        //     { id: 'album8', title: '日常随拍', folder: 'images/casual', count: 4 },
-        //     { id: 'album9', title: '珍贵瞬间', folder: 'images/precious', count: 5 }
-        // ];
-
-        // // 创建相册HTML
-        // function createGalleryHTML() {
-        //     const mainGallery = document.getElementById('main-gallery');
-            
-        //     galleryConfig.forEach(config => {
-        //         const galleryItem = document.createElement('div');
-        //         galleryItem.id = config.id;
-        //         galleryItem.className = 'gallery-item';
-                
-        //         // 创建第一个可见的图片链接
-        //         const firstImage = document.createElement('a');
-        //         firstImage.href = `${config.folder}/1.jpg`;
-        //         const img = document.createElement('img');
-        //         img.src = `${config.folder}/1.jpg`;
-        //         img.alt = config.title;
-        //         firstImage.appendChild(img);
-                
-        //         // 添加标题
-        //         const caption = document.createElement('p');
-        //         caption.className = 'caption';
-        //         caption.textContent = config.title;
-                
-        //         galleryItem.appendChild(firstImage);
-        //         galleryItem.appendChild(caption);
-                
-        //         // 添加其他隐藏的图片链接
-        //         for (let i = 2; i <= config.count; i++) {
-        //             const hiddenLink = document.createElement('a');
-        //             hiddenLink.href = `${config.folder}/${i}.jpg`;
-        //             hiddenLink.style.display = 'none';
-        //             galleryItem.appendChild(hiddenLink);
-        //         }
-                
-        //         mainGallery.appendChild(galleryItem);
-        //     });
-        // }
-
-        // // 初始化所有相册
-        // function initGalleries() {
-        //     createGalleryHTML();
-            
-        //     galleryConfig.forEach(config => {
-        //         lightGallery(document.getElementById(config.id), {
-        //             selector: 'a',
-        //             thumbnail: true,
-        //             loop: true,
-        //             autoplay: true,
-        //             autoplayControls: true,
-        //             progressBar: true
-        //         });
-        //     });
-        // }
-
-        // // 初始化相册
-        // initGalleries();
-
-        // --- 音乐播放列表功能 ---
-        const musicPlayer = document.getElementById('bg-music');
-        const playBtn = document.getElementById('play-music-btn');
+            createGalleries();
         
-        const musicPlaylist = [
-            'music/クリスマスソング.m4a',
-            'music/The Scientist.mp3',
-            'music/街灯晚餐.m4a'
-        ];
+            // ====================== 音乐播放器代码 (无需修改) =====================
+            const musicPlayer = document.getElementById('bg-music');
+            const playBtn = document.getElementById('play-music-btn');
+            const songTitleEl = document.getElementById('song-title');
+            const progressBar = document.getElementById('progress-bar');
+            
+            const musicPlaylist = [
+                'music/クリスマスソング.m4a',
+                'music/The Scientist.mp3',
+                'music/街灯晚餐.m4a'
+            ];
+            
+            let currentSongIndex = 0;
         
-        let currentSongIndex = 0;
-
-        function playNextSong() {
-            currentSongIndex = (currentSongIndex + 1) % musicPlaylist.length; // 循环播放
-            musicPlayer.src = musicPlaylist[currentSongIndex];
-            musicPlayer.play();
-        }
-
-        // 监听歌曲播放结束事件
-        musicPlayer.addEventListener('ended', playNextSong);
-
-        // 监听播放按钮点击事件
-        playBtn.addEventListener('click', () => {
-            if (musicPlayer.paused) {
-                musicPlayer.src = musicPlaylist[currentSongIndex];
+            function loadSong(songIndex) {
+                musicPlayer.src = musicPlaylist[songIndex];
+                const songName = musicPlaylist[songIndex].split('/').pop().split('.').slice(0, -1).join('.');
+                songTitleEl.textContent = `正在播放: ${songName}`;
+            }
+        
+            function playNextSong() {
+                currentSongIndex = (currentSongIndex + 1) % musicPlaylist.length;
+                loadSong(currentSongIndex);
                 musicPlayer.play();
-                playBtn.textContent = '⏸️ 暂停音乐';
-            } else {
-                musicPlayer.pause();
-                playBtn.textContent = '🎵 继续播放';
             }
+        
+            playBtn.addEventListener('click', () => {
+                if (musicPlayer.paused) {
+                    if (!musicPlayer.src) {
+                        loadSong(currentSongIndex);
+                    }
+                    musicPlayer.play();
+                    playBtn.textContent = '⏸️ 暂停音乐';
+                } else {
+                    musicPlayer.pause();
+                    playBtn.textContent = '🎵 继续播放';
+                }
+            });
+        
+            musicPlayer.addEventListener('ended', playNextSong);
+        
+            musicPlayer.addEventListener('timeupdate', () => {
+                if (musicPlayer.duration) {
+                    const progressPercent = (musicPlayer.currentTime / musicPlayer.duration) * 100;
+                    progressBar.style.width = `${progressPercent}%`;
+                }
+            });
+        
+            const initialSongName = musicPlaylist[0].split('/').pop().split('.').slice(0, -1).join('.');
+            songTitleEl.textContent = `待机: ${initialSongName}`;
         });
-    </script>
-
+        </script>
 </body>
 </html>
